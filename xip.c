@@ -32,6 +32,7 @@ do_xip_mapping_read(struct address_space *mapping,
 	unsigned long offset;
 	loff_t isize, pos;
 	size_t copied = 0, error = 0;
+	timing_t memcpy_time;
 
 	pos = *ppos;
 	index = pos >> PAGE_CACHE_SHIFT;
@@ -88,10 +89,12 @@ do_xip_mapping_read(struct address_space *mapping,
 		 * "pos" here (the actor routine has to update the user buffer
 		 * pointers and the remaining count).
 		 */
+		PMFS_START_TIMING(memcpy_r_t, memcpy_time);
 		if (!zero)
 			left = __copy_to_user(buf+copied, xip_mem+offset, nr);
 		else
 			left = __clear_user(buf + copied, nr);
+		PMFS_END_TIMING(memcpy_r_t, memcpy_time);
 
 		if (left) {
 			error = -EFAULT;
@@ -161,6 +164,7 @@ __pmfs_xip_file_write(struct address_space *mapping, const char __user *buf,
 	size_t      bytes;
 	ssize_t     written = 0;
 	struct pmfs_inode *pi;
+	timing_t memcpy_time;
 
 	pi = pmfs_get_inode(sb, inode->i_ino);
 	do {
@@ -179,10 +183,13 @@ __pmfs_xip_file_write(struct address_space *mapping, const char __user *buf,
 		status = pmfs_get_xip_mem(mapping, index, 1, &xmem, &xpfn);
 		if (status)
 			break;
+
+		PMFS_START_TIMING(memcpy_w_t, memcpy_time);
 		pmfs_xip_mem_protect(sb, xmem + offset, bytes, 1);
 		copied = bytes -
 		__copy_from_user_inatomic_nocache(xmem + offset, buf, bytes);
 		pmfs_xip_mem_protect(sb, xmem + offset, bytes, 0);
+		PMFS_END_TIMING(memcpy_w_t, memcpy_time);
 
 		/* if start or end dest address is not 8 byte aligned, 
 	 	 * __copy_from_user_inatomic_nocache uses cacheable instructions
@@ -227,13 +234,16 @@ static ssize_t pmfs_file_write_fast(struct super_block *sb, struct inode *inode,
 {
 	void *xmem = pmfs_get_block(sb, block);
 	size_t copied, ret = 0, offset;
+	timing_t memcpy_time;
 
 	offset = pos & (sb->s_blocksize - 1);
 
+	PMFS_START_TIMING(memcpy_w_t, memcpy_time);
 	pmfs_xip_mem_protect(sb, xmem + offset, count, 1);
 	copied = count - __copy_from_user_inatomic_nocache(xmem
 		+ offset, buf, count);
 	pmfs_xip_mem_protect(sb, xmem + offset, count, 0);
+	PMFS_END_TIMING(memcpy_w_t, memcpy_time);
 
 	pmfs_flush_edge_cachelines(pos, copied, xmem + offset);
 
