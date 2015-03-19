@@ -7,6 +7,7 @@ const char *Timingstring[TIMING_NUM] =
 	"xip_write_fast",
 	"memcpy_read",
 	"memcpy_write",
+	"alloc_blocks",
 	"logging",
 };
 

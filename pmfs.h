@@ -110,6 +110,7 @@ enum timing_category {
 	xip_write_fast_t,
 	memcpy_r_t,
 	memcpy_w_t,
+	alloc_blocks_t,
 	logging_t,
 	TIMING_NUM,
 };

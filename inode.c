@@ -660,9 +660,12 @@ int __pmfs_alloc_blocks(pmfs_transaction_t *trans, struct super_block *sb,
 	unsigned int data_bits = blk_type_to_shift[pi->i_blk_type];
 	unsigned int blk_shift, meta_bits = META_BLK_SHIFT;
 	unsigned long blocknr, first_blocknr, last_blocknr, total_blocks;
+	timing_t alloc_time;
+
 	/* convert the 4K blocks into the actual blocks the inode is using */
 	blk_shift = data_bits - sb->s_blocksize_bits;
 
+	PMFS_START_TIMING(alloc_blocks_t, alloc_time);
 	first_blocknr = file_blocknr >> blk_shift;
 	last_blocknr = (file_blocknr + num - 1) >> blk_shift;
 
@@ -736,8 +739,10 @@ int __pmfs_alloc_blocks(pmfs_transaction_t *trans, struct super_block *sb,
 		if (errval < 0)
 			goto fail;
 	}
+	PMFS_END_TIMING(alloc_blocks_t, alloc_time);
 	return 0;
 fail:
+	PMFS_END_TIMING(alloc_blocks_t, alloc_time);
 	return errval;
 }
 
