@@ -5,6 +5,7 @@ const char *Timingstring[TIMING_NUM] =
 	"xip_read",
 	"xip_write",
 	"xip_write_fast",
+	"internal_write",
 	"memcpy_read",
 	"memcpy_write",
 	"alloc_blocks",

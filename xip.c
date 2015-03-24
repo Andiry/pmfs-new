@@ -164,8 +164,9 @@ __pmfs_xip_file_write(struct address_space *mapping, const char __user *buf,
 	size_t      bytes;
 	ssize_t     written = 0;
 	struct pmfs_inode *pi;
-	timing_t memcpy_time;
+	timing_t memcpy_time, write_time;
 
+	PMFS_START_TIMING(internal_write_t, write_time);
 	pi = pmfs_get_inode(sb, inode->i_ino);
 	do {
 		unsigned long index;
@@ -222,6 +223,7 @@ __pmfs_xip_file_write(struct address_space *mapping, const char __user *buf,
 		pmfs_update_isize(inode, pi);
 	}
 
+	PMFS_END_TIMING(internal_write_t, write_time);
 	return written ? written : status;
 }
 
