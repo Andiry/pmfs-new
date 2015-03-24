@@ -112,7 +112,9 @@ enum timing_category {
 	memcpy_r_t,
 	memcpy_w_t,
 	alloc_blocks_t,
-	logging_t,
+	new_trans_t,
+	add_log_t,
+	commit_trans_t,
 	TIMING_NUM,
 };
 

@@ -9,7 +9,9 @@ const char *Timingstring[TIMING_NUM] =
 	"memcpy_read",
 	"memcpy_write",
 	"alloc_blocks",
-	"logging",
+	"new_trans",
+	"add_logentry",
+	"commit_trans",
 };
 
 unsigned long long Timingstats[TIMING_NUM];
