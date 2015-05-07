@@ -187,8 +187,8 @@ __pmfs_xip_file_write(struct address_space *mapping, const char __user *buf,
 
 		PMFS_START_TIMING(memcpy_w_t, memcpy_time);
 		pmfs_xip_mem_protect(sb, xmem + offset, bytes, 1);
-		copied = bytes -
-		__copy_from_user_inatomic_nocache(xmem + offset, buf, bytes);
+		copied = bytes - __copy_from_user(xmem + offset, buf, bytes);
+		pmfs_flush_buffer(xmem + offset, copied, 0);
 		pmfs_xip_mem_protect(sb, xmem + offset, bytes, 0);
 		PMFS_END_TIMING(memcpy_w_t, memcpy_time);
 
@@ -242,8 +242,8 @@ static ssize_t pmfs_file_write_fast(struct super_block *sb, struct inode *inode,
 
 	PMFS_START_TIMING(memcpy_w_t, memcpy_time);
 	pmfs_xip_mem_protect(sb, xmem + offset, count, 1);
-	copied = count - __copy_from_user_inatomic_nocache(xmem
-		+ offset, buf, count);
+	copied = count - __copy_from_user(xmem + offset, buf, count);
+	pmfs_flush_buffer(xmem + offset, copied, 0);
 	pmfs_xip_mem_protect(sb, xmem + offset, count, 0);
 	PMFS_END_TIMING(memcpy_w_t, memcpy_time);
 
