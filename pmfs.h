@@ -20,6 +20,8 @@
 #include <linux/pagemap.h>
 #include <linux/rcupdate.h>
 #include <linux/types.h>
+#include <linux/uio.h>
+#include <linux/version.h>
 
 #include "pmfs_def.h"
 #include "journal.h"

@@ -1588,6 +1588,8 @@ void pmfs_get_inode_flags(struct inode *inode, struct pmfs_inode *pi)
 	pi->i_flags = cpu_to_le32(pmfs_flags);
 }
 
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(4,0,9)
+
 static ssize_t pmfs_direct_IO(int rw, struct kiocb *iocb,
 	struct iov_iter *iter, loff_t offset)
 {
@@ -1636,6 +1638,59 @@ static ssize_t pmfs_direct_IO(int rw, struct kiocb *iocb,
 err:
 	return err;
 }
+
+#else
+
+static ssize_t pmfs_direct_IO(struct kiocb *iocb,
+	struct iov_iter *iter, loff_t offset)
+{
+	struct file *filp = iocb->ki_filp;
+	struct inode *inode = filp->f_mapping->host;
+	loff_t end = offset;
+	ssize_t err = -EINVAL;
+	unsigned long seg;
+	unsigned long nr_segs = iter->nr_segs;
+	const struct iovec *iv = iter->iov;
+
+	for (seg = 0; seg < nr_segs; seg++) {
+		end += iv->iov_len;
+		iv++;
+	}
+
+	if ((iov_iter_rw(iter) == WRITE) && end > i_size_read(inode)) {
+		/* FIXME: Do we need to check for out of bounds IO for R/W */
+		printk(KERN_ERR "pmfs: needs to grow (size = %lld)\n", end);
+		return err;
+	}
+
+	iv = iter->iov;
+	for (seg = 0; seg < nr_segs; seg++) {
+		if (iov_iter_rw(iter) == READ) {
+			err = pmfs_xip_file_read(filp, iv->iov_base,
+					iv->iov_len, &offset);
+		} else if (iov_iter_rw(iter) == WRITE) {
+			mutex_unlock(&inode->i_mutex);
+			err = pmfs_xip_file_write(filp, iv->iov_base,
+					iv->iov_len, &offset);
+			mutex_lock(&inode->i_mutex);
+		}
+		if (err <= 0)
+			goto err;
+		if (iter->count > iv->iov_len)
+			iter->count -= iv->iov_len;
+		else
+			iter->count = 0;
+		iter->nr_segs--;
+		iv++;
+	}
+	if (offset != end)
+		printk(KERN_ERR "pmfs: direct_IO: end = %lld"
+			"but offset = %lld\n", end, offset);
+err:
+	return err;
+}
+
+#endif
 
 const struct address_space_operations pmfs_aops_xip = {
 	.direct_IO		= pmfs_direct_IO,
