@@ -35,9 +35,12 @@
 #include "pmfs.h"
 
 int measure_timing = 0;
+int support_clwb = 0;
 
 module_param(measure_timing, int, S_IRUGO);
 MODULE_PARM_DESC(measure_timing, "Timing measurement");
+module_param(support_clwb, int, S_IRUGO);
+MODULE_PARM_DESC(support_clwb, "Support clwb");
 
 static struct super_operations pmfs_sops;
 static const struct export_operations pmfs_export_ops;

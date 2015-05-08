@@ -125,6 +125,7 @@ extern unsigned long long Timingstats[TIMING_NUM];
 extern u64 Countstats[TIMING_NUM];
 
 extern int measure_timing;
+extern int support_clwb;
 
 typedef struct timespec timing_t;
 
@@ -241,16 +242,21 @@ static inline void PERSISTENT_MARK(void)
 static inline void PERSISTENT_BARRIER(void)
 {
 	asm volatile ("sfence\n" : : );
-	_mm_pcommit();
+	if (support_clwb)
+		_mm_pcommit();
 }
 
 static inline void pmfs_flush_buffer(void *buf, uint32_t len, bool fence)
 {
 	uint32_t i;
 	len = len + ((unsigned long)(buf) & (CACHELINE_SIZE - 1));
-	for (i = 0; i < len; i += CACHELINE_SIZE)
-//		asm volatile ("clflush %0\n" : "+m" (*(char *)(buf+i)));
-		_mm_clwb(buf + i);
+	if (support_clwb) {
+		for (i = 0; i < len; i += CACHELINE_SIZE)
+			_mm_clwb(buf + i);
+	} else {
+		for (i = 0; i < len; i += CACHELINE_SIZE)
+			_mm_clflush(buf + i);
+	}
 	/* Do a fence only if asked. We often don't need to do a fence
 	 * immediately after clflush because even if we get context switched
 	 * between clflush and subsequent fence, the context switch operation
