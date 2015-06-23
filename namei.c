@@ -248,6 +248,8 @@ static int pmfs_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 	inode = pmfs_new_inode(trans, dir, mode, &dentry->d_name);
 	if (IS_ERR(inode))
 		goto out_err;
+	pmfs_dbg_Verbose("%s: %s, ino %lu\n", __func__,
+				dentry->d_name.name, inode->i_ino);
 	inode->i_op = &pmfs_file_inode_operations;
 	inode->i_mapping->a_ops = &pmfs_aops_xip;
 	inode->i_fop = &pmfs_xip_file_operations;
@@ -420,6 +422,8 @@ static int pmfs_unlink(struct inode *dir, struct dentry *dentry)
 	}
 	pmfs_add_logentry(sb, trans, pi, MAX_DATA_PER_LENTRY, LE_DATA);
 
+	pmfs_dbg_verbose("%s: %s, ino %lu\n", __func__,
+				dentry->d_name.name, inode->i_ino);
 	retval = pmfs_remove_entry(trans, dentry, inode);
 	if (retval)
 		goto end_unlink;
@@ -471,6 +475,8 @@ static int pmfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 		goto out;
 	}
 
+	pmfs_dbg_verbose("%s: %s, ino %lu\n", __func__,
+				dentry->d_name.name, inode->i_ino);
 	inode->i_op = &pmfs_dir_inode_operations;
 	inode->i_fop = &pmfs_dir_operations;
 	inode->i_mapping->a_ops = &pmfs_aops_xip;
@@ -611,6 +617,8 @@ static int pmfs_rmdir(struct inode *dir, struct dentry *dentry)
 	if (!inode)
 		return -ENOENT;
 
+	pmfs_dbg_verbose("%s: %s, ino %lu\n", __func__,
+				dentry->d_name.name, inode->i_ino);
 	if (pmfs_inode_by_name(dir, &dentry->d_name, &de) == 0)
 		return -ENOENT;
 
@@ -672,6 +680,8 @@ static int pmfs_rename(struct inode *old_dir,
 	pmfs_inode_by_name(new_dir, &new_dentry->d_name, &new_de);
 	pmfs_inode_by_name(old_dir, &old_dentry->d_name, &old_de);
 
+	pmfs_dbg_verbose("%s: rename %s to %s\n", __func__,
+			old_dentry->d_name.name, new_dentry->d_name.name);
 	trans = pmfs_new_transaction(sb, MAX_INODE_LENTRIES * 4 +
 			MAX_DIRENTRY_LENTRIES * 2);
 	if (IS_ERR(trans)) {
