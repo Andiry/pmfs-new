@@ -248,7 +248,7 @@ static int pmfs_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 	inode = pmfs_new_inode(trans, dir, mode, &dentry->d_name);
 	if (IS_ERR(inode))
 		goto out_err;
-	pmfs_dbg_Verbose("%s: %s, ino %lu\n", __func__,
+	pmfs_dbg_verbose("%s: %s, ino %lu\n", __func__,
 				dentry->d_name.name, inode->i_ino);
 	inode->i_op = &pmfs_file_inode_operations;
 	inode->i_mapping->a_ops = &pmfs_aops_xip;
