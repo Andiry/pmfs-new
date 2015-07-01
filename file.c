@@ -189,7 +189,9 @@ int pmfs_fsync(struct file *file, loff_t start, loff_t end, int datasync)
 	struct address_space *mapping = file->f_mapping;
 	struct inode *inode = mapping->host;
 	loff_t isize;
+	timing_t fsync_time;
 
+	PMFS_START_TIMING(fsync_t, fsync_time);
 	/* if the file is not mmap'ed, there is no need to do clflushes */
 	if (mapping_mapped(mapping) == 0)
 		goto persist;
@@ -204,6 +206,7 @@ int pmfs_fsync(struct file *file, loff_t start, loff_t end, int datasync)
 	{
 		pmfs_dbg_verbose("[%s:%d] : (ERR) isize(%llx), start(%llx),"
 			" end(%llx)\n", __func__, __LINE__, isize, start, end);
+		PMFS_END_TIMING(fsync_t, fsync_time);
 		return -ENODATA;
 	}
 
@@ -242,6 +245,7 @@ int pmfs_fsync(struct file *file, loff_t start, loff_t end, int datasync)
 persist:
 	PERSISTENT_MARK();
 	PERSISTENT_BARRIER();
+	PMFS_END_TIMING(fsync_t, fsync_time);
 	return 0;
 }
 

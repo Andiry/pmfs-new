@@ -117,6 +117,9 @@ enum timing_category {
 	new_trans_t,
 	add_log_t,
 	commit_trans_t,
+	fsync_t,
+	free_tree_t,
+	evict_inode_t,
 	TIMING_NUM,
 };
 

@@ -320,10 +320,12 @@ unsigned int pmfs_free_inode_subtree(struct super_block *sb,
 	unsigned long first_blocknr;
 	unsigned int freed;
 	bool mpty;
+	timing_t free_time;
 
 	if (!root)
 		return 0;
 
+	PMFS_START_TIMING(free_tree_t, free_time);
 	if (height == 0) {
 		first_blocknr = pmfs_get_blocknr(sb, le64_to_cpu(root),
 			btype);
@@ -339,6 +341,7 @@ unsigned int pmfs_free_inode_subtree(struct super_block *sb,
 			PMFS_BLOCK_TYPE_4K);
 		pmfs_free_block(sb, first_blocknr,PMFS_BLOCK_TYPE_4K);
 	}
+	PMFS_END_TIMING(free_tree_t, free_time);
 	return freed;
 }
 
@@ -1008,7 +1011,9 @@ void pmfs_evict_inode(struct inode *inode)
 	unsigned long last_blocknr;
 	unsigned int height, btype;
 	int err = 0;
+	timing_t evict_time;
 
+	PMFS_START_TIMING(evict_inode_t, evict_time);
 	if (!inode->i_nlink && !is_bad_inode(inode)) {
 		if (!(S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode) ||
 			S_ISLNK(inode->i_mode)))
@@ -1052,6 +1057,7 @@ out:
 	truncate_inode_pages(&inode->i_data, 0);
 
 	clear_inode(inode);
+	PMFS_END_TIMING(evict_inode_t, evict_time);
 }
 
 static int pmfs_increase_inode_table_size(struct super_block *sb)

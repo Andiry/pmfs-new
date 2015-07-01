@@ -12,6 +12,9 @@ const char *Timingstring[TIMING_NUM] =
 	"new_trans",
 	"add_logentry",
 	"commit_trans",
+	"fsync",
+	"free_tree",
+	"evict_inode",
 };
 
 unsigned long long Timingstats[TIMING_NUM];
