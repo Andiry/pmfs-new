@@ -20,6 +20,14 @@ const char *Timingstring[TIMING_NUM] =
 unsigned long long Timingstats[TIMING_NUM];
 u64 Countstats[TIMING_NUM];
 
+atomic64_t fsync_pages = ATOMIC_INIT(0);
+
+void pmfs_print_IO_stats(void)
+{
+	printk("=========== PMFS I/O stats ===========\n");
+	printk("Fsync %ld pages\n", atomic64_read(&fsync_pages));
+}
+
 void pmfs_print_timing_stats(void)
 {
 	int i;
@@ -39,6 +47,8 @@ void pmfs_print_timing_stats(void)
 				Countstats[i]);
 		}
 	}
+
+	pmfs_print_IO_stats();
 }
 
 void pmfs_clear_stats(void)

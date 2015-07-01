@@ -232,6 +232,7 @@ int pmfs_fsync(struct file *file, loff_t start, loff_t end, int datasync)
 		if (block) {
 			xip_mem = pmfs_get_block(inode->i_sb, block);
 			/* flush the range */
+			atomic64_inc(&fsync_pages);
 			pmfs_flush_buffer(xip_mem + offset, nr_flush_bytes, 0);
 		} else {
 			/* sparse files could have such holes */

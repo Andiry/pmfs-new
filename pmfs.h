@@ -130,6 +130,8 @@ extern u64 Countstats[TIMING_NUM];
 extern int measure_timing;
 extern int support_clwb;
 
+extern atomic64_t fsync_pages;
+
 typedef struct timespec timing_t;
 
 #define PMFS_START_TIMING(name, start) \
