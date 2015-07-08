@@ -10,7 +10,7 @@ all:
 	make -C /media/root/External-Linux/linux-kernel M=`pwd`
 
 running:
-	make -C /media/root/New_Volume1/linux-kernel M=`pwd`
+	make -C /media/root/New_Volume1/pmfs M=`pwd`
 	
 pmep:
 	make -C /root/Andiry/linux-test M=`pwd`
