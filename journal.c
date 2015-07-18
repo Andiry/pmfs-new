@@ -249,13 +249,15 @@ static uint32_t pmfs_recover_transaction(struct super_block *sb, uint32_t head,
 /* process the transaction starting at a valid log entry *le */
 /* called by the log cleaner and journal recovery */
 static uint32_t pmfs_process_transaction(struct super_block *sb, uint32_t head,
-		uint32_t tail, pmfs_logentry_t *le, bool recover)
+	uint32_t tail, pmfs_logentry_t *le, bool recover, int *processed)
 {
 	struct pmfs_sb_info *sbi = PMFS_SB(sb);
 	pmfs_transaction_t trans;
 	uint16_t gen_id;
 	uint32_t new_head = head;
+	int handled = 0;
 
+	*processed = 0;
 	gen_id = le16_to_cpu(le->gen_id);
 	if (!(le->type & LE_START)) {
 		pmfs_dbg("start of trans %x but LE_START not set. gen_id %d\n",
@@ -270,6 +272,7 @@ static uint32_t pmfs_process_transaction(struct super_block *sb, uint32_t head,
 		trans.num_entries++;
 		trans.num_used++;
 		new_head = next_log_entry(sbi->jsize, new_head);
+		handled++;
 
 		/* Handle committed/aborted transactions */
 		if ((gen_id == le16_to_cpu(le->gen_id)) && (le->type & LE_COMMIT
@@ -310,10 +313,11 @@ static uint32_t pmfs_process_transaction(struct super_block *sb, uint32_t head,
 		}
 	} while (new_head != tail);
 
+	*processed = handled;
 	return head;
 }
 
-static void pmfs_clean_journal(struct super_block *sb, bool unmount)
+static int pmfs_clean_journal(struct super_block *sb, bool unmount)
 {
 	struct pmfs_sb_info *sbi = PMFS_SB(sb);
 	pmfs_journal_t *journal = pmfs_get_journal(sb);
@@ -321,6 +325,8 @@ static void pmfs_clean_journal(struct super_block *sb, bool unmount)
 	uint32_t new_head, tail;
 	uint16_t gen_id;
 	volatile __le64 *ptr_tail_genid;
+	int processed = 0;
+	int total = 0;
 	u64 tail_genid;
 	pmfs_logentry_t *le;
 
@@ -346,7 +352,8 @@ static void pmfs_clean_journal(struct super_block *sb, bool unmount)
 		if (gen_id == le16_to_cpu(le->gen_id)) {
 			/* found a valid log entry, process the transaction */
 			new_head = pmfs_process_transaction(sb, head, tail,
-				le, false);
+				le, false, &processed);
+			total += processed;
 			/* no progress was made. return */
 			if (new_head == head)
 				break;
@@ -378,6 +385,7 @@ static void pmfs_clean_journal(struct super_block *sb, bool unmount)
 	}
 	pmfs_dbg_trans("leaving journal cleaning %x %x\n", head, tail);
 	mutex_unlock(&sbi->journal_mutex);
+	return total;
 }
 
 static void log_cleaner_try_sleeping(struct  pmfs_sb_info *sbi)
@@ -829,6 +837,7 @@ static int pmfs_recover_redo_journal(struct super_block *sb)
 	uint32_t tail = le32_to_cpu(journal->tail);
 	uint32_t head = le32_to_cpu(journal->head);
 	uint16_t gen_id = le16_to_cpu(journal->gen_id);
+	int processed = 0;
 	pmfs_logentry_t *le;
 
 	/* journal wrapped around. so head points to previous generation id */
@@ -839,7 +848,7 @@ static int pmfs_recover_redo_journal(struct super_block *sb)
 		le = (pmfs_logentry_t *)(sbi->journal_base_addr + head);
 		if (gen_id == le16_to_cpu(le->gen_id)) {
 			head = pmfs_process_transaction(sb, head, tail,
-				le, true);
+				le, true, &processed);
 		} else {
 			if (gen_id == MAX_GEN_ID) {
 				pmfs_memunlock_range(sb, le, sizeof(*le));
