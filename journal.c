@@ -317,7 +317,8 @@ static uint32_t pmfs_process_transaction(struct super_block *sb, uint32_t head,
 	return head;
 }
 
-static int pmfs_clean_journal(struct super_block *sb, bool unmount)
+static int pmfs_clean_journal(struct super_block *sb, bool unmount,
+	int take_lock)
 {
 	struct pmfs_sb_info *sbi = PMFS_SB(sb);
 	pmfs_journal_t *journal = pmfs_get_journal(sb);
@@ -330,7 +331,8 @@ static int pmfs_clean_journal(struct super_block *sb, bool unmount)
 	u64 tail_genid;
 	pmfs_logentry_t *le;
 
-	mutex_lock(&sbi->journal_mutex);
+	if (take_lock)
+		mutex_lock(&sbi->journal_mutex);
 	head = le32_to_cpu(journal->head);
 	ptr_tail_genid = (volatile __le64 *)&journal->tail;
 
@@ -384,7 +386,8 @@ static int pmfs_clean_journal(struct super_block *sb, bool unmount)
 		PERSISTENT_BARRIER();
 	}
 	pmfs_dbg_trans("leaving journal cleaning %x %x\n", head, tail);
-	mutex_unlock(&sbi->journal_mutex);
+	if (take_lock)
+		mutex_unlock(&sbi->journal_mutex);
 	return total;
 }
 
@@ -408,9 +411,9 @@ static int pmfs_log_cleaner(void *arg)
 		if (kthread_should_stop())
 			break;
 
-		pmfs_clean_journal(sb, false);
+		pmfs_clean_journal(sb, false, 1);
 	}
-	pmfs_clean_journal(sb, true);
+	pmfs_clean_journal(sb, true, 1);
 	pmfs_dbg_trans("Exiting log cleaner thread\n");
 	return 0;
 }
@@ -491,10 +494,12 @@ inline pmfs_transaction_t *pmfs_current_transaction(void)
 	return (pmfs_transaction_t *)current->journal_info;
 }
 
-static int pmfs_free_logentries(int max_log_entries)
+static int pmfs_free_logentries(struct super_block *sb, int max_log_entries)
 {
-	pmfs_dbg("pmfs_free_logentries: Not Implemented\n");
-	return -ENOMEM;
+	int freed_entries = 0;
+
+	freed_entries = pmfs_clean_journal(sb, false, 0);
+	return LOGENTRY_SIZE * freed_entries;
 }
 
 pmfs_transaction_t *pmfs_new_transaction(struct super_block *sb,
@@ -544,7 +549,7 @@ again:
 	if (avail_size < req_size) {
 		uint32_t freed_size;
 		/* run the log cleaner function to free some log entries */
-		freed_size = pmfs_free_logentries(max_log_entries);
+		freed_size = pmfs_free_logentries(sb, max_log_entries);
 		if ((avail_size + freed_size) < req_size)
 			goto journal_full;
 	}
