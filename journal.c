@@ -508,7 +508,7 @@ pmfs_transaction_t *pmfs_new_transaction(struct super_block *sb,
 	pmfs_journal_t *journal = pmfs_get_journal(sb);
 	struct pmfs_sb_info *sbi = PMFS_SB(sb);
 	pmfs_transaction_t *trans;
-	uint32_t head, tail, req_size, avail_size;
+	uint32_t head, tail, req_size, avail_size, freed_size;
 	uint64_t base;
 	timing_t log_time;
 #if 0
@@ -547,7 +547,6 @@ again:
 	avail_size = avail_size - LOGENTRY_SIZE;
 
 	if (avail_size < req_size) {
-		uint32_t freed_size;
 		/* run the log cleaner function to free some log entries */
 		freed_size = pmfs_free_logentries(sb, max_log_entries);
 		if ((avail_size + freed_size) < req_size)
@@ -597,6 +596,8 @@ journal_full:
 		le64_to_cpu(journal->base), le32_to_cpu(journal->size),
 		le32_to_cpu(journal->head), le32_to_cpu(journal->tail),
 		max_log_entries);
+	pmfs_err(sb, "avail size %u, freed size %u, request size %u\n",
+		avail_size, freed_size, req_size);
 	pmfs_free_transaction(trans);
 	PMFS_END_TIMING(new_trans_t, log_time);
 	return ERR_PTR(-EAGAIN);
