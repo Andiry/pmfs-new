@@ -317,12 +317,16 @@ static void pmfs_clean_journal(struct super_block *sb, bool unmount)
 {
 	struct pmfs_sb_info *sbi = PMFS_SB(sb);
 	pmfs_journal_t *journal = pmfs_get_journal(sb);
-	uint32_t head = le32_to_cpu(journal->head);
+	uint32_t head;
 	uint32_t new_head, tail;
 	uint16_t gen_id;
-	volatile __le64 *ptr_tail_genid = (volatile __le64 *)&journal->tail;
+	volatile __le64 *ptr_tail_genid;
 	u64 tail_genid;
 	pmfs_logentry_t *le;
+
+	mutex_lock(&sbi->journal_mutex);
+	head = le32_to_cpu(journal->head);
+	ptr_tail_genid = (volatile __le64 *)&journal->tail;
 
 	/* atomically read both tail and gen_id of journal. Normally use of
 	 * volatile is prohibited in kernel code but since we use volatile
@@ -373,6 +377,7 @@ static void pmfs_clean_journal(struct super_block *sb, bool unmount)
 		PERSISTENT_BARRIER();
 	}
 	pmfs_dbg_trans("leaving journal cleaning %x %x\n", head, tail);
+	mutex_unlock(&sbi->journal_mutex);
 }
 
 static void log_cleaner_try_sleeping(struct  pmfs_sb_info *sbi)
