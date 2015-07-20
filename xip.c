@@ -488,10 +488,13 @@ static int __pmfs_xip_file_fault(struct vm_area_struct *vma,
 static int pmfs_xip_file_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
 	int ret = 0;
+	timing_t fault_time;
 
+	PMFS_START_TIMING(mmap_fault_t, fault_time);
 	rcu_read_lock();
 	ret = __pmfs_xip_file_fault(vma, vmf);
 	rcu_read_unlock();
+	PMFS_END_TIMING(mmap_fault_t, fault_time);
 	return ret;
 }
 
