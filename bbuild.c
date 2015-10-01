@@ -484,6 +484,7 @@ int pmfs_setup_blocknode_map(struct super_block *sb)
 		goto end;
 	}
 
+	pmfs_dbg("PMFS: Performing failure recovery\n");
 	bm.bitmap_4k_size = (initsize >> (PAGE_SHIFT + 0x3)) + 1;
 	bm.bitmap_2M_size = (initsize >> (PAGE_SHIFT_2M + 0x3)) + 1;
 	bm.bitmap_1G_size = (initsize >> (PAGE_SHIFT_1G + 0x3)) + 1;
