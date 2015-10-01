@@ -121,6 +121,7 @@ enum timing_category {
 	fsync_t,
 	free_tree_t,
 	evict_inode_t,
+	recovery_t,
 	TIMING_NUM,
 };
 

@@ -16,6 +16,7 @@ const char *Timingstring[TIMING_NUM] =
 	"fsync",
 	"free_tree",
 	"evict_inode",
+	"recovery",
 };
 
 unsigned long long Timingstats[TIMING_NUM];

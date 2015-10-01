@@ -466,6 +466,13 @@ int pmfs_setup_blocknode_map(struct super_block *sb)
 	struct scan_bitmap bm;
 	unsigned long initsize = le64_to_cpu(super->s_size);
 	bool value = false;
+	timing_t start, end;
+
+	/* Always check recovery time */
+	if (measure_timing == 0)
+		getrawmonotonic(&start);
+
+	PMFS_START_TIMING(recovery_t, start);
 
 	mutex_init(&sbi->inode_table_mutex);
 	sbi->block_start = (unsigned long)0;
@@ -474,7 +481,7 @@ int pmfs_setup_blocknode_map(struct super_block *sb)
 	value = pmfs_can_skip_full_scan(sb);
 	if (value) {
 		pmfs_dbg_verbose("PMFS: Skipping full scan of inodes...\n");
-		return 0;
+		goto end;
 	}
 
 	bm.bitmap_4k_size = (initsize >> (PAGE_SHIFT + 0x3)) + 1;
@@ -513,6 +520,15 @@ skip:
 	kfree(bm.bitmap_4k);
 	kfree(bm.bitmap_2M);
 	kfree(bm.bitmap_1G);
+
+end:
+	PMFS_END_TIMING(recovery_t, start);
+	if (measure_timing == 0) {
+		getrawmonotonic(&end);
+		Timingstats[recovery_t] +=
+			(end.tv_sec - start.tv_sec) * 1000000000 +
+			(end.tv_nsec - start.tv_nsec);
+	}
 
 	return 0;
 }
