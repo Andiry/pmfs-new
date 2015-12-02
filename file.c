@@ -264,6 +264,7 @@ static int pmfs_flush(struct file *file, fl_owner_t id)
 	return ret;
 }
 
+#if 0
 static unsigned long
 pmfs_get_unmapped_area(struct file *file, unsigned long addr,
 			unsigned long len, unsigned long pgoff,
@@ -315,6 +316,7 @@ pmfs_get_unmapped_area(struct file *file, unsigned long addr,
 	info.align_offset = 0;
 	return vm_unmapped_area(&info);
 }
+#endif
 
 const struct file_operations pmfs_xip_file_operations = {
 	.llseek			= pmfs_llseek,
@@ -328,7 +330,7 @@ const struct file_operations pmfs_xip_file_operations = {
 	.open			= generic_file_open,
 	.fsync			= pmfs_fsync,
 	.flush			= pmfs_flush,
-	.get_unmapped_area	= pmfs_get_unmapped_area,
+//	.get_unmapped_area	= pmfs_get_unmapped_area,
 	.unlocked_ioctl		= pmfs_ioctl,
 	.fallocate		= pmfs_fallocate,
 #ifdef CONFIG_COMPAT
