@@ -285,6 +285,7 @@ struct pmfs_sb_info {
 	 * base physical and virtual address of PMFS (which is also
 	 * the pointer to the super block)
 	 */
+	struct block_device *s_bdev;
 	phys_addr_t	phys_addr;
 	void		*virt_addr;
 	struct list_head block_inuse_head;

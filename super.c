@@ -97,39 +97,27 @@ static inline int pmfs_has_huge_ioremap(struct super_block *sb)
 	return sbi->s_mount_opt & PMFS_MOUNT_HUGEIOREMAP;
 }
 
-void *pmfs_ioremap(struct super_block *sb, phys_addr_t phys_addr, ssize_t size)
+static int pmfs_get_block_info(struct super_block *sb,
+	struct pmfs_sb_info *sbi)
 {
-	void __iomem *retval;
-	int protect, hugeioremap;
+	void *virt_addr = NULL;
+	unsigned long pfn;
+	long size;
 
-	if (sb) {
-		protect = pmfs_is_wprotected(sb);
-		hugeioremap = pmfs_has_huge_ioremap(sb);
-	} else {
-		protect = 0;
-		hugeioremap = 1;
+	if (!sb->s_bdev->bd_disk->fops->direct_access) {
+		pmfs_err(sb, "device does not support DAX\n");
+		return -EINVAL;
 	}
 
-	/*
-	 * NOTE: Userland may not map this resource, we will mark the region so
-	 * /dev/mem and the sysfs MMIO access will not be allowed. This
-	 * restriction depends on STRICT_DEVMEM option. If this option is
-	 * disabled or not available we mark the region only as busy.
-	 */
-	retval = (void __iomem *)
-			request_mem_region_exclusive(phys_addr, size, "pmfs");
-	if (!retval)
-		goto fail;
+	sbi->s_bdev = sb->s_bdev;
 
-	retval = ioremap_cache(phys_addr, size);
+	size = sb->s_bdev->bd_disk->fops->direct_access(sb->s_bdev,
+				0, &virt_addr, &pfn, 0);
 
-fail:
-	return (void __force *)retval;
-}
+	sbi->virt_addr = virt_addr;
+	sbi->phys_addr = pfn << PAGE_SHIFT;
+	sbi->initsize = size;
 
-static inline int pmfs_iounmap(void *virt_addr, ssize_t size, int protected)
-{
-	iounmap((void __iomem __force *)virt_addr);
 	return 0;
 }
 
@@ -147,7 +135,7 @@ static loff_t pmfs_max_size(int bits)
 }
 
 enum {
-	Opt_addr, Opt_bpi, Opt_size, Opt_jsize,
+	Opt_bpi, Opt_init, Opt_jsize,
 	Opt_num_inodes, Opt_mode, Opt_uid,
 	Opt_gid, Opt_blocksize, Opt_wprotect, Opt_wprotectold,
 	Opt_err_cont, Opt_err_panic, Opt_err_ro,
@@ -155,9 +143,8 @@ enum {
 };
 
 static const match_table_t tokens = {
-	{ Opt_addr,	     "physaddr=%x"	  },
 	{ Opt_bpi,	     "bpi=%u"		  },
-	{ Opt_size,	     "init=%s"		  },
+	{ Opt_init,	     "init"		  },
 	{ Opt_jsize,     "jsize=%s"		  },
 	{ Opt_num_inodes,"num_inodes=%u"  },
 	{ Opt_mode,	     "mode=%o"		  },
@@ -174,31 +161,6 @@ static const match_table_t tokens = {
 	{ Opt_bs,	     "backing_dev=%s"	  },
 	{ Opt_err,	     NULL		  },
 };
-
-static phys_addr_t get_phys_addr(void **data)
-{
-	phys_addr_t phys_addr;
-	char *options = (char *)*data;
-
-	if (!options || strncmp(options, "physaddr=", 9) != 0)
-		return (phys_addr_t)ULLONG_MAX;
-	options += 9;
-	phys_addr = (phys_addr_t)simple_strtoull(options, &options, 0);
-	if (*options && *options != ',') {
-		printk(KERN_ERR "Invalid phys addr specification: %s\n",
-		       (char *)*data);
-		return (phys_addr_t)ULLONG_MAX;
-	}
-	if (phys_addr & (PAGE_SIZE - 1)) {
-		printk(KERN_ERR "physical address 0x%16llx for pmfs isn't "
-		       "aligned to a page boundary\n", (u64)phys_addr);
-		return (phys_addr_t)ULLONG_MAX;
-	}
-	if (*options == ',')
-		options++;
-	*data = (void *)options;
-	return phys_addr;
-}
 
 static int pmfs_parse_options(char *options, struct pmfs_sb_info *sbi,
 			       bool remount)
@@ -217,11 +179,6 @@ static int pmfs_parse_options(char *options, struct pmfs_sb_info *sbi,
 
 		token = match_token(p, tokens, args);
 		switch (token) {
-		case Opt_addr:
-			if (remount)
-				goto bad_opt;
-			/* physaddr managed in get_phys_addr() */
-			break;
 		case Opt_bpi:
 			if (remount)
 				goto bad_opt;
@@ -246,13 +203,9 @@ static int pmfs_parse_options(char *options, struct pmfs_sb_info *sbi,
 				goto bad_val;
 			sbi->mode = option & 01777U;
 			break;
-		case Opt_size:
+		case Opt_init:
 			if (remount)
 				goto bad_opt;
-			/* memparse() will accept a K/M/G without a digit */
-			if (!isdigit(*args[0].from))
-				goto bad_val;
-			sbi->initsize = memparse(args[0].from, &rest);
 			set_opt(sbi->s_mount_opt, FORMAT);
 			break;
 		case Opt_jsize:
@@ -377,7 +330,6 @@ static struct pmfs_inode *pmfs_init(struct super_block *sb,
 	unsigned long blocknr;
 
 	pmfs_info("creating an empty pmfs of size %lu\n", size);
-	sbi->virt_addr = pmfs_ioremap(sb, sbi->phys_addr, size);
 	sbi->block_start = (unsigned long)0;
 	sbi->block_end = ((unsigned long)(size) >> PAGE_SHIFT);
 	sbi->num_free_blocks = ((unsigned long)(size) >> PAGE_SHIFT);
@@ -636,7 +588,7 @@ static int pmfs_fill_super(struct super_block *sb, void *data, int silent)
 	struct pmfs_inode *root_pi;
 	struct pmfs_sb_info *sbi = NULL;
 	struct inode *root_i = NULL;
-	unsigned long blocksize, initsize = 0;
+	unsigned long blocksize;
 	u32 random = 0;
 	int retval = -EINVAL;
 
@@ -664,8 +616,7 @@ static int pmfs_fill_super(struct super_block *sb, void *data, int silent)
 
 	set_default_opts(sbi);
 
-	sbi->phys_addr = get_phys_addr(&data);
-	if (sbi->phys_addr == (phys_addr_t)ULLONG_MAX)
+	if (pmfs_get_block_info(sb, sbi))
 		goto out;
 
 	get_random_bytes(&random, sizeof(u32));
@@ -689,11 +640,10 @@ static int pmfs_fill_super(struct super_block *sb, void *data, int silent)
 		goto out;
 
 	set_opt(sbi->s_mount_opt, MOUNTING);
-	initsize = sbi->initsize;
 
 	/* Init a new pmfs instance */
-	if (initsize) {
-		root_pi = pmfs_init(sb, initsize);
+	if (sbi->s_mount_opt & PMFS_MOUNT_FORMAT) {
+		root_pi = pmfs_init(sb, sbi->initsize);
 		if (IS_ERR(root_pi))
 			goto out;
 		super = pmfs_get_super(sb);
@@ -701,32 +651,6 @@ static int pmfs_fill_super(struct super_block *sb, void *data, int silent)
 	}
 	pmfs_dbg_verbose("checking physical address 0x%016llx for pmfs image\n",
 		  (u64)sbi->phys_addr);
-
-	/* Map only one page for now. Will remap it when fs size is known. */
-	initsize = PAGE_SIZE;
-	sbi->virt_addr = pmfs_ioremap(sb, sbi->phys_addr, initsize);
-	if (!sbi->virt_addr) {
-		printk(KERN_ERR "ioremap of the pmfs image failed(2)\n");
-		goto out;
-	}
-
-	super = pmfs_get_super(sb);
-
-	initsize = le64_to_cpu(super->s_size);
-	sbi->initsize = initsize;
-	pmfs_dbg_verbose("pmfs image appears to be %lu KB in size\n",
-		   initsize >> 10);
-
-	pmfs_iounmap(sbi->virt_addr, PAGE_SIZE, pmfs_is_wprotected(sb));
-
-	/* Remap the whole filesystem now */
-	release_mem_region(sbi->phys_addr, PAGE_SIZE);
-	/* FIXME: Remap the whole filesystem in pmfs virtual address range. */
-	sbi->virt_addr = pmfs_ioremap(sb, sbi->phys_addr, initsize);
-	if (!sbi->virt_addr) {
-		printk(KERN_ERR "ioremap of the pmfs image failed(3)\n");
-		goto out;
-	}
 
 	super = pmfs_get_super(sb);
 
@@ -810,11 +734,6 @@ setup_sb:
 	retval = 0;
 	return retval;
 out:
-	if (sbi->virt_addr) {
-		pmfs_iounmap(sbi->virt_addr, initsize, pmfs_is_wprotected(sb));
-		release_mem_region(sbi->phys_addr, initsize);
-	}
-
 	kfree(sbi);
 	return retval;
 }
@@ -928,8 +847,6 @@ restore_opt:
 static void pmfs_put_super(struct super_block *sb)
 {
 	struct pmfs_sb_info *sbi = PMFS_SB(sb);
-	struct pmfs_super_block *ps = pmfs_get_super(sb);
-	u64 size = le64_to_cpu(ps->s_size);
 	struct pmfs_blocknode *i;
 	struct list_head *head = &(sbi->block_inuse_head);
 
@@ -942,9 +859,7 @@ static void pmfs_put_super(struct super_block *sb)
 	if (sbi->virt_addr) {
 		pmfs_save_blocknode_mappings(sb);
 		pmfs_journal_uninit(sb);
-		pmfs_iounmap(sbi->virt_addr, size, pmfs_is_wprotected(sb));
 		sbi->virt_addr = NULL;
-		release_mem_region(sbi->phys_addr, size);
 	}
 
 	/* Free all the pmfs_blocknodes */
@@ -1104,14 +1019,14 @@ static struct super_operations pmfs_sops = {
 static struct dentry *pmfs_mount(struct file_system_type *fs_type,
 				  int flags, const char *dev_name, void *data)
 {
-	return mount_nodev(fs_type, flags, data, pmfs_fill_super);
+	return mount_bdev(fs_type, flags, dev_name, data, pmfs_fill_super);
 }
 
 static struct file_system_type pmfs_fs_type = {
 	.owner		= THIS_MODULE,
 	.name		= "pmfs",
 	.mount		= pmfs_mount,
-	.kill_sb	= kill_anon_super,
+	.kill_sb	= kill_block_super,
 };
 
 static struct inode *pmfs_nfs_get_inode(struct super_block *sb,
