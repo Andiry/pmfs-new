@@ -2,6 +2,7 @@
 
 const char *Timingstring[TIMING_NUM] = 
 {
+	"readdir",
 	"xip_read",
 	"xip_write",
 	"xip_write_fast",
