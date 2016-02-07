@@ -355,6 +355,10 @@ ssize_t pmfs_xip_file_write(struct file *filp, const char __user *buf,
 	}
 	pos = *ppos;
 	count = len;
+	if (count == 0) {
+		ret = 0;
+		goto out;
+	}
 
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(4,0,9)
 	ret = generic_write_checks(filp, &pos, &count, S_ISBLK(inode->i_mode));
