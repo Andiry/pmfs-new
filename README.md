@@ -51,4 +51,4 @@ There are two scripts provided in the source code, `setup-pmfs.sh` and `remount-
 * PMFS only works on x86-64 kernels.
 * PMFS does not currently support extended attributes or ACL.
 * PMFS requires the underlying block device to support DAX (Direct Access) feature.
-
+* This project cuts some features of the original PMFS, such as memory protection and huge mmap support. If you need these features, please turn to the original PMFS.
