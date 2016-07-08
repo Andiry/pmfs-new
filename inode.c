@@ -1602,7 +1602,8 @@ static ssize_t pmfs_direct_IO(int rw, struct kiocb *iocb,
 	struct file *filp = iocb->ki_filp;
 	struct inode *inode = filp->f_mapping->host;
 	loff_t end = offset;
-	ssize_t err = -EINVAL;
+	ssize_t ret = -EINVAL;
+	ssize_t written = 0;
 	unsigned long seg;
 	unsigned long nr_segs = iter->nr_segs;
 	const struct iovec *iv = iter->iov;
@@ -1621,28 +1622,32 @@ static ssize_t pmfs_direct_IO(int rw, struct kiocb *iocb,
 	iv = iter->iov;
 	for (seg = 0; seg < nr_segs; seg++) {
 		if (rw == READ) {
-			err = pmfs_xip_file_read(filp, iv->iov_base,
+			ret = pmfs_xip_file_read(filp, iv->iov_base,
 					iv->iov_len, &offset);
 		} else if (rw == WRITE) {
 			mutex_unlock(&inode->i_mutex);
-			err = pmfs_xip_file_write(filp, iv->iov_base,
+			ret = pmfs_xip_file_write(filp, iv->iov_base,
 					iv->iov_len, &offset);
 			mutex_lock(&inode->i_mutex);
 		}
-		if (err <= 0)
+		if (ret < 0)
 			goto err;
+
 		if (iter->count > iv->iov_len)
 			iter->count -= iv->iov_len;
 		else
 			iter->count = 0;
+
+		written += ret;
 		iter->nr_segs--;
 		iv++;
 	}
 	if (offset != end)
 		printk(KERN_ERR "pmfs: direct_IO: end = %lld"
 			"but offset = %lld\n", end, offset);
+	ret = written;
 err:
-	return err;
+	return ret;
 }
 
 #else
@@ -1653,7 +1658,8 @@ static ssize_t pmfs_direct_IO(struct kiocb *iocb,
 	struct file *filp = iocb->ki_filp;
 	struct inode *inode = filp->f_mapping->host;
 	loff_t end = offset;
-	ssize_t err = -EINVAL;
+	ssize_t ret = -EINVAL;
+	ssize_t written = 0;
 	unsigned long seg;
 	unsigned long nr_segs = iter->nr_segs;
 	const struct iovec *iv = iter->iov;
@@ -1666,34 +1672,38 @@ static ssize_t pmfs_direct_IO(struct kiocb *iocb,
 	if ((iov_iter_rw(iter) == WRITE) && end > i_size_read(inode)) {
 		/* FIXME: Do we need to check for out of bounds IO for R/W */
 		printk(KERN_ERR "pmfs: needs to grow (size = %lld)\n", end);
-		return err;
+		return ret;
 	}
 
 	iv = iter->iov;
 	for (seg = 0; seg < nr_segs; seg++) {
 		if (iov_iter_rw(iter) == READ) {
-			err = pmfs_xip_file_read(filp, iv->iov_base,
+			ret = pmfs_xip_file_read(filp, iv->iov_base,
 					iv->iov_len, &offset);
 		} else if (iov_iter_rw(iter) == WRITE) {
 			mutex_unlock(&inode->i_mutex);
-			err = pmfs_xip_file_write(filp, iv->iov_base,
+			ret = pmfs_xip_file_write(filp, iv->iov_base,
 					iv->iov_len, &offset);
 			mutex_lock(&inode->i_mutex);
 		}
-		if (err <= 0)
+		if (ret < 0)
 			goto err;
+
 		if (iter->count > iv->iov_len)
 			iter->count -= iv->iov_len;
 		else
 			iter->count = 0;
+
+		written += ret;
 		iter->nr_segs--;
 		iv++;
 	}
 	if (offset != end)
 		printk(KERN_ERR "pmfs: direct_IO: end = %lld"
 			"but offset = %lld\n", end, offset);
+	ret = written;
 err:
-	return err;
+	return ret;
 }
 
 #endif
