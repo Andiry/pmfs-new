@@ -2,6 +2,8 @@
 
 const char *Timingstring[TIMING_NUM] = 
 {
+	"create",
+	"unlink",
 	"readdir",
 	"xip_read",
 	"xip_write",
