@@ -39,6 +39,22 @@ int pmfs_block_symlink(struct inode *inode, const char *symname, int len)
 	return 0;
 }
 
+/* FIXME: Temporary workaround */
+static int pmfs_readlink_copy(char __user *buffer, int buflen, const char *link)
+{
+	int len = PTR_ERR(link);
+	if (IS_ERR(link))
+		goto out;
+
+	len = strlen(link);
+	if (len > (unsigned) buflen)
+		len = buflen;
+	if (copy_to_user(buffer, link, len))
+		len = -EFAULT;
+out:
+	return len;
+}
+
 static int pmfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
 {
 	struct inode *inode = dentry->d_inode;
@@ -48,12 +64,12 @@ static int pmfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
 
 	block = pmfs_find_data_block(inode, 0);
 	blockp = pmfs_get_block(sb, block);
-	return readlink_copy(buffer, buflen, blockp);
+	return pmfs_readlink_copy(buffer, buflen, blockp);
 }
 
-static const char *pmfs_follow_link(struct dentry *dentry, void **cookie)
+static const char *pmfs_get_link(struct dentry *dentry, struct inode *inode,
+	struct delayed_call *done)
 {
-	struct inode *inode = dentry->d_inode;
 	struct super_block *sb = inode->i_sb;
 	off_t block;
 	char *blockp;
@@ -65,6 +81,6 @@ static const char *pmfs_follow_link(struct dentry *dentry, void **cookie)
 
 const struct inode_operations pmfs_symlink_inode_operations = {
 	.readlink	= pmfs_readlink,
-	.follow_link	= pmfs_follow_link,
+	.get_link	= pmfs_get_link,
 	.setattr	= pmfs_notify_change,
 };

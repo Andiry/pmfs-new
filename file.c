@@ -85,7 +85,7 @@ static long pmfs_fallocate(struct file *file, int mode, loff_t offset,
 	if (S_ISDIR(inode->i_mode))
 		return -ENODEV;
 
-	mutex_lock(&inode->i_mutex);
+	inode_lock(inode);
 
 	new_size = len + offset;
 	if (!(mode & FALLOC_FL_KEEP_SIZE) && new_size > inode->i_size) {
@@ -134,7 +134,7 @@ static long pmfs_fallocate(struct file *file, int mode, loff_t offset,
 	pmfs_commit_transaction(sb, trans);
 
 out:
-	mutex_unlock(&inode->i_mutex);
+	inode_unlock(inode);
 	return ret;
 }
 
@@ -146,19 +146,19 @@ static loff_t pmfs_llseek(struct file *file, loff_t offset, int origin)
 	if (origin != SEEK_DATA && origin != SEEK_HOLE)
 		return generic_file_llseek(file, offset, origin);
 
-	mutex_lock(&inode->i_mutex);
+	inode_lock(inode);
 	switch (origin) {
 	case SEEK_DATA:
 		retval = pmfs_find_region(inode, &offset, 0);
 		if (retval) {
-			mutex_unlock(&inode->i_mutex);
+			inode_unlock(inode);
 			return retval;
 		}
 		break;
 	case SEEK_HOLE:
 		retval = pmfs_find_region(inode, &offset, 1);
 		if (retval) {
-			mutex_unlock(&inode->i_mutex);
+			inode_unlock(inode);
 			return retval;
 		}
 		break;
@@ -166,7 +166,7 @@ static loff_t pmfs_llseek(struct file *file, loff_t offset, int origin)
 
 	if ((offset < 0 && !(file->f_mode & FMODE_UNSIGNED_OFFSET)) ||
 	    offset > inode->i_sb->s_maxbytes) {
-		mutex_unlock(&inode->i_mutex);
+		inode_unlock(inode);
 		return -EINVAL;
 	}
 
@@ -175,7 +175,7 @@ static loff_t pmfs_llseek(struct file *file, loff_t offset, int origin)
 		file->f_version = 0;
 	}
 
-	mutex_unlock(&inode->i_mutex);
+	inode_unlock(inode);
 	return offset;
 }
 
@@ -220,10 +220,10 @@ int pmfs_fsync(struct file *file, loff_t start, loff_t end, int datasync)
 		loff_t offset;
 		unsigned long nr_flush_bytes;
 
-		pgoff = start >> PAGE_CACHE_SHIFT;
-		offset = start & ~PAGE_CACHE_MASK;
+		pgoff = start >> PAGE_SHIFT;
+		offset = start & ~PAGE_MASK;
 
-		nr_flush_bytes = PAGE_CACHE_SIZE - offset;
+		nr_flush_bytes = PAGE_SIZE - offset;
 		if (nr_flush_bytes > (end - start))
 			nr_flush_bytes = end - start;
 
