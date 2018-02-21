@@ -391,7 +391,7 @@ static int pmfs_link(struct dentry *dest_dentry, struct inode *dir,
 
 	err = pmfs_add_entry(trans, dentry, inode);
 	if (!err) {
-		inode->i_ctime = CURRENT_TIME_SEC;
+		inode->i_ctime = current_time(inode);
 		inc_nlink(inode);
 
 		pmfs_memunlock_inode(sb, pi);
@@ -730,7 +730,7 @@ static int pmfs_rename(struct inode *old_dir,
 		pmfs_add_logentry(sb, trans, new_pidir, MAX_DATA_PER_LENTRY,
 			LE_DATA);
 		/*new_dir->i_version++; */
-		new_dir->i_ctime = new_dir->i_mtime = CURRENT_TIME_SEC;
+		new_dir->i_ctime = new_dir->i_mtime = current_time(new_dir);
 		pmfs_update_time(new_dir, new_pidir);
 	}
 
@@ -742,7 +742,7 @@ static int pmfs_rename(struct inode *old_dir,
 	if (new_inode) {
 		pi = pmfs_get_inode(sb, new_inode->i_ino);
 		pmfs_add_logentry(sb, trans, pi, MAX_DATA_PER_LENTRY, LE_DATA);
-		new_inode->i_ctime = CURRENT_TIME;
+		new_inode->i_ctime = current_time(new_inode);
 
 		pmfs_memunlock_inode(sb, pi);
 		if (S_ISDIR(old_inode->i_mode)) {

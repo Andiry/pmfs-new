@@ -32,6 +32,7 @@
 #include <linux/cred.h>
 #include <linux/backing-dev.h>
 #include <linux/list.h>
+#include <linux/dax.h>
 #include "pmfs.h"
 
 int measure_timing = 0;
@@ -100,22 +101,34 @@ static inline int pmfs_has_huge_ioremap(struct super_block *sb)
 static int pmfs_get_block_info(struct super_block *sb,
 	struct pmfs_sb_info *sbi)
 {
+	struct dax_device *dax_dev;
 	void *virt_addr = NULL;
-	pfn_t pfn;
+	pfn_t __pfn_t;
 	long size;
+	int ret;
 
-	if (!sb->s_bdev->bd_disk->fops->direct_access) {
+	ret = bdev_dax_supported(sb, PAGE_SIZE);
+	if (ret) {
 		pmfs_err(sb, "device does not support DAX\n");
 		return -EINVAL;
 	}
 
 	sbi->s_bdev = sb->s_bdev;
+	dax_dev = fs_dax_get_by_host(sb->s_bdev->bd_disk->disk_name);
+	if (!dax_dev) {
+		pmfs_err(sb, "Couldn't retrieve DAX device\n");
+		return -EINVAL;
+	}
 
-	size = sb->s_bdev->bd_disk->fops->direct_access(sb->s_bdev,
-				0, &virt_addr, &pfn, 0);
+	size = dax_direct_access(dax_dev, 0, LONG_MAX / PAGE_SIZE,
+				&virt_addr, &__pfn_t) * PAGE_SIZE;
+	if (size <= 0) {
+		pmfs_err(sb, "direct_access failed\n");
+		return -EINVAL;
+	}
 
 	sbi->virt_addr = virt_addr;
-	sbi->phys_addr = pfn_t_to_pfn(pfn) << PAGE_SHIFT;
+	sbi->phys_addr = pfn_t_to_pfn(__pfn_t) << PAGE_SHIFT;
 	sbi->initsize = size;
 
 	return 0;
@@ -916,7 +929,7 @@ static struct inode *pmfs_alloc_inode(struct super_block *sb)
 	if (!vi)
 		return NULL;
 
-	vi->vfs_inode.i_version = 1;
+//	vi->vfs_inode.i_version = 1;
 	return &vi->vfs_inode;
 }
 

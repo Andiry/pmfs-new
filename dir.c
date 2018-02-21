@@ -93,7 +93,7 @@ static int pmfs_add_dirent_to_buf(pmfs_transaction_t *trans,
 	 * completion of syscall, but too many callers depend
 	 * on this.
 	 */
-	dir->i_mtime = dir->i_ctime = CURRENT_TIME_SEC;
+	dir->i_mtime = dir->i_ctime = current_time(dir);
 	/*dir->i_version++; */
 
 	pmfs_memunlock_inode(dir->i_sb, pidir);
@@ -210,7 +210,7 @@ int pmfs_remove_entry(pmfs_transaction_t *trans, struct dentry *de,
 		pmfs_memlock_block(sb, blk_base);
 	}
 	/*dir->i_version++; */
-	dir->i_ctime = dir->i_mtime = CURRENT_TIME_SEC;
+	dir->i_ctime = dir->i_mtime = current_time(dir);
 
 	pidir = pmfs_get_inode(sb, dir->i_ino);
 	pmfs_add_logentry(sb, trans, pidir, MAX_DATA_PER_LENTRY, LE_DATA);

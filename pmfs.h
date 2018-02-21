@@ -209,8 +209,8 @@ extern void pmfs_update_time(struct inode *inode, struct pmfs_inode *pi);
 extern int pmfs_write_inode(struct inode *inode, struct writeback_control *wbc);
 extern void pmfs_dirty_inode(struct inode *inode, int flags);
 extern int pmfs_notify_change(struct dentry *dentry, struct iattr *attr);
-int pmfs_getattr(struct vfsmount *mnt, struct dentry *dentry, 
-		struct kstat *stat);
+int pmfs_getattr(const struct path *path, struct kstat *stat,
+		u32 request_mask, unsigned int flags);
 extern void pmfs_set_inode_flags(struct inode *inode, struct pmfs_inode *pi);
 extern void pmfs_get_inode_flags(struct inode *inode, struct pmfs_inode *pi);
 extern unsigned long pmfs_find_region(struct inode *inode, loff_t *offset,

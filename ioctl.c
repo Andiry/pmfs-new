@@ -78,7 +78,7 @@ long pmfs_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 		flags = flags & FS_FL_USER_MODIFIABLE;
 		flags |= oldflags & ~FS_FL_USER_MODIFIABLE;
-		inode->i_ctime = CURRENT_TIME_SEC;
+		inode->i_ctime = current_time(inode);
 		trans = pmfs_new_transaction(sb, MAX_INODE_LENTRIES);
 		if (IS_ERR(trans)) {
 			ret = PTR_ERR(trans);
@@ -117,7 +117,7 @@ flags_out:
 			goto out;
 		}
 		pmfs_add_logentry(sb, trans, pi, sizeof(*pi), LE_DATA);
-		inode->i_ctime = CURRENT_TIME_SEC;
+		inode->i_ctime = current_time(inode);
 		inode->i_generation = generation;
 		pmfs_memunlock_inode(sb, pi);
 		pi->i_ctime = cpu_to_le32(inode->i_ctime.tv_sec);

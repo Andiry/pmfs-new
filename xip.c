@@ -270,7 +270,7 @@ static ssize_t pmfs_file_write_fast(struct super_block *sb, struct inode *inode,
 	if (unlikely(copied != count && copied == 0))
 		ret = -EFAULT;
 	*ppos = pos;
-	inode->i_ctime = inode->i_mtime = CURRENT_TIME_SEC;
+	inode->i_ctime = inode->i_mtime = current_time(inode);
 	if (pos > inode->i_size) {
 		/* make sure written data is persistent before updating
 	 	* time and size */
@@ -397,7 +397,7 @@ ssize_t pmfs_xip_file_write(struct file *filp, const char __user *buf,
 		pmfs_abort_transaction(sb, trans);
 		goto out;
 	}
-	inode->i_ctime = inode->i_mtime = CURRENT_TIME_SEC;
+	inode->i_ctime = inode->i_mtime = current_time(inode);
 	pmfs_update_time(inode, pi);
 
 	/* We avoid zeroing the alloc'd range, which is going to be overwritten
@@ -485,14 +485,14 @@ static int __pmfs_xip_file_fault(struct vm_area_struct *vma,
 	return VM_FAULT_NOPAGE;
 }
 
-static int pmfs_xip_file_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+static int pmfs_xip_file_fault(struct vm_fault *vmf)
 {
 	int ret = 0;
 	timing_t fault_time;
 
 	PMFS_START_TIMING(mmap_fault_t, fault_time);
 	rcu_read_lock();
-	ret = __pmfs_xip_file_fault(vma, vmf);
+	ret = __pmfs_xip_file_fault(vmf->vma, vmf);
 	rcu_read_unlock();
 	PMFS_END_TIMING(mmap_fault_t, fault_time);
 	return ret;

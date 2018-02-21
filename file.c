@@ -116,7 +116,7 @@ static long pmfs_fallocate(struct file *file, int mode, loff_t offset,
 	num_blocks = (blockoff + len + blocksize_mask) >> sb->s_blocksize_bits;
 	ret = pmfs_alloc_blocks(trans, inode, blocknr, num_blocks, true);
 
-	inode->i_mtime = inode->i_ctime = CURRENT_TIME_SEC;
+	inode->i_mtime = inode->i_ctime = current_time(inode);
 
 	pmfs_memunlock_inode(sb, pi);
 	if (ret || (mode & FALLOC_FL_KEEP_SIZE)) {

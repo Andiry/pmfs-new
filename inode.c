@@ -446,7 +446,7 @@ static void __pmfs_truncate_blocks(struct inode *inode, loff_t start,
 	unsigned int meta_bits = META_BLK_SHIFT;
 	bool mpty;
 
-	inode->i_mtime = inode->i_ctime = CURRENT_TIME_SEC;
+	inode->i_mtime = inode->i_ctime = current_time(inode);
 
 	if (!pi->root)
 		goto end_truncate_blocks;
@@ -1046,7 +1046,7 @@ void pmfs_evict_inode(struct inode *inode)
 
 		/* then free the blocks from the inode's b-tree */
 		pmfs_free_inode_subtree(sb, root, height, btype, last_blocknr);
-		inode->i_mtime = inode->i_ctime = CURRENT_TIME_SEC;
+		inode->i_mtime = inode->i_ctime = current_time(inode);
 		inode->i_size = 0;
 	}
 out:
@@ -1117,7 +1117,7 @@ struct inode *pmfs_new_inode(pmfs_transaction_t *trans, struct inode *dir,
 
 	inode_init_owner(inode, dir, mode);
 	inode->i_blocks = inode->i_size = 0;
-	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
+	inode->i_mtime = inode->i_atime = inode->i_ctime = current_time(inode);
 
 	inode->i_generation = atomic_add_return(1, &sbi->next_generation);
 
@@ -1443,12 +1443,12 @@ void pmfs_setsize(struct inode *inode, loff_t newsize)
 	}
 }
 
-int pmfs_getattr(struct vfsmount *mnt, struct dentry *dentry,
-		         struct kstat *stat)
+int pmfs_getattr(const struct path *path, struct kstat *stat,
+		u32 request_mask, unsigned int flags)
 {
 	struct inode *inode;
 
-	inode = dentry->d_inode;
+	inode = path->dentry->d_inode;
 	generic_fillattr(inode, stat);
 	/* stat->blocks should be the number of 512B blocks */
 	stat->blocks = (inode->i_blocks << inode->i_sb->s_blocksize_bits) >> 9;
