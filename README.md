@@ -10,7 +10,7 @@ https://github.com/linux-pmfs/pmfs
 This project ports PMFS to the latest Linux kernel so developers can compare PMFS to other file systems on the new kernel.
 
 ## Building PMFS
-The master branch works on the 4.3 version of x86-64 Linux kernel.
+The master branch works on the 4.15 version of x86-64 Linux kernel.
 
 To build PMFS, simply run a
 
