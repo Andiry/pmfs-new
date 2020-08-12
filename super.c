@@ -109,8 +109,8 @@ static int pmfs_get_block_info(struct super_block *sb,
 
 	ret = bdev_dax_supported(sb, PAGE_SIZE);
 	if (ret) {
-		pmfs_err(sb, "device does not support DAX\n");
-		return -EINVAL;
+		pmfs_err(sb, "device does not support DAX: %d\n", ret);
+		return ret;
 	}
 
 	sbi->s_bdev = sb->s_bdev;
